@@ -1,0 +1,267 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Games Hub</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+</head>
+<body class="bg-green-50 min-h-screen">
+  <!-- Navigation Bar -->
+  <nav class="sticky top-0 bg-green-600 text-white shadow-md">
+    <div class="container mx-auto px-4">
+      <div class="flex justify-between items-center py-4">
+        <a class="text-2xl font-bold" href="#">Edu Learn</a>
+      </div>
+    </div>
+  </nav>
+
+  <!-- Main Content -->
+  <div class="container mx-auto px-4 py-8">
+    <!-- Games Grid -->
+    <div class="grid grid-cols-1 md:grid-cols-2 gap-8">
+      <!-- Memory Card Game Section -->
+      <section id="memory-game" class="bg-white rounded-xl shadow-lg p-8">
+        <h1 class="text-3xl font-bold text-green-800 text-center mb-6">Memory Card Game</h1>
+        <div id="gameBoard" class="grid grid-cols-4 gap-4 w-80 mx-auto">
+          <!-- Cards will be generated dynamically -->
+        </div>
+        <p id="status" class="mt-6 text-lg text-gray-800 text-center"></p>
+        <div class="text-center mt-4">
+          <button id="restart" class="px-4 py-2 bg-green-600 text-white rounded shadow hover:bg-green-700 transition-colors">
+            Restart Game
+          </button>
+        </div>
+      </section>
+
+      <!-- Tic-Tac-Toe Section -->
+      <section id="tic-tac-toe" class="bg-white rounded-xl shadow-lg p-8">
+        <h1 class="text-3xl font-bold text-green-800 text-center mb-6">Tic-Tac-Toe</h1>
+        <div id="board" class="grid grid-cols-3 gap-4 w-64 mx-auto">
+          <!-- Cells will be added dynamically -->
+        </div>
+        <div id="message" class="mt-6 text-xl font-semibold text-gray-800 text-center"></div>
+        <div class="text-center mt-4">
+          <button id="reset" class="px-4 py-2 bg-green-600 text-white rounded shadow hover:bg-green-700 transition-colors">
+            Restart Game
+          </button>
+        </div>
+      </section>
+
+       <!-- Hangman -->
+       <section id="hangman" class="bg-white rounded-xl shadow-lg p-8">
+        <h1 class="text-3xl font-bold text-green-800 text-center mb-6">Hangman</h1>
+        <p id="word-display" class="text-2xl text-center font-mono mb-4"></p>
+        <input type="text" id="guess" class="border-2 p-2 w-full text-center" maxlength="1" placeholder="Enter a letter">
+        <p id="hangman-status" class="text-lg text-center mt-4"></p>
+        <div class="text-center mt-4">
+          <button id="hangman-restart" class="px-4 py-2 bg-green-600 text-white rounded shadow hover:bg-green-700">Restart</button>
+        </div>
+      </section>
+      
+      <!-- Snake Game -->
+      <section id="snake-game" class="bg-white rounded-xl shadow-lg p-8">
+        <h1 class="text-3xl font-bold text-green-800 text-center mb-6">Snake Game</h1>
+        <canvas id="snakeCanvas" width="300" height="300" class="block mx-auto border-2"></canvas>
+      </section>
+    </div>
+  </div>
+
+  <!-- Scripts for Games -->
+  <script>
+    // Memory Card Game Script
+    const gameBoard = document.getElementById("gameBoard");
+    const statusText = document.getElementById("status");
+    const restartButton = document.getElementById("restart");
+
+    const cardIcons = ["🐶", "🐱", "🐭", "🦊", "🐼", "🐨", "🐵", "🦁"];
+    let shuffledCards = [];
+    let flippedCards = [];
+    let matchedPairs = 0;
+
+    function startGame() {
+      shuffledCards = [...cardIcons, ...cardIcons].sort(() => 0.5 - Math.random());
+      gameBoard.innerHTML = "";
+      flippedCards = [];
+      matchedPairs = 0;
+      statusText.textContent = "Find all pairs!";
+      shuffledCards.forEach((icon, index) => {
+        const card = document.createElement("div");
+        card.classList.add(
+          "card", "h-16", "w-16", "bg-green-500", "text-white", "rounded", "flex", 
+          "items-center", "justify-center", "text-2xl", "cursor-pointer", "font-bold"
+        );
+        card.dataset.index = index;
+        card.addEventListener("click", handleCardClick);
+        gameBoard.appendChild(card);
+      });
+    }
+
+    function handleCardClick(event) {
+      const card = event.target;
+      const index = card.dataset.index;
+
+      if (card.textContent || flippedCards.length >= 2) return;
+
+      card.textContent = shuffledCards[index];
+      card.classList.add("bg-green-700");
+      flippedCards.push({ card, index });
+
+      if (flippedCards.length === 2) {
+        checkMatch();
+      }
+    }
+
+    function checkMatch() {
+      const [first, second] = flippedCards;
+      if (shuffledCards[first.index] === shuffledCards[second.index]) {
+        first.card.classList.add("bg-yellow-500");
+        second.card.classList.add("bg-yellow-500");
+        matchedPairs++;
+        flippedCards = [];
+        if (matchedPairs === cardIcons.length) {
+          statusText.textContent = "You won! 🎉";
+        }
+      } else {
+        setTimeout(() => {
+          first.card.textContent = "";
+          second.card.textContent = "";
+          first.card.classList.remove("bg-green-700");
+          second.card.classList.remove("bg-green-700");
+          flippedCards = [];
+        }, 1000);
+      }
+    }
+
+    restartButton.addEventListener("click", startGame);
+    startGame();
+
+    // Tic-Tac-Toe Script
+    const board = document.getElementById('board');
+    const message = document.getElementById('message');
+    const resetButton = document.getElementById('reset');
+    let currentPlayer = 'X';
+    let gameState = Array(9).fill(null);
+
+    const winningCombos = [
+      [0, 1, 2], [3, 4, 5], [6, 7, 8], // Rows
+      [0, 3, 6], [1, 4, 7], [2, 5, 8], // Columns
+      [0, 4, 8], [2, 4, 6]             // Diagonals
+    ];
+
+    function createBoard() {
+      board.innerHTML = '';
+      gameState = Array(9).fill(null);
+      currentPlayer = 'X';
+      message.textContent = "Player X's Turn";
+      for (let i = 0; i < 9; i++) {
+        const cell = document.createElement('div');
+        cell.classList.add('h-16', 'w-16', 'bg-white', 'border', 'border-gray-300', 'flex', 'items-center', 'justify-center', 'text-2xl', 'font-bold', 'cursor-pointer');
+        cell.dataset.index = i;
+        cell.addEventListener('click', handleMove);
+        board.appendChild(cell);
+      }
+    }
+
+    function handleMove(event) {
+      const cell = event.target;
+      const index = cell.dataset.index;
+
+      if (!gameState[index]) {
+        gameState[index] = currentPlayer;
+        cell.textContent = currentPlayer;
+        cell.classList.add(currentPlayer === 'X' ? 'text-blue-500' : 'text-red-500');
+
+        if (checkWin()) {
+          message.textContent = `Player ${currentPlayer} Wins!`;
+          board.querySelectorAll('div').forEach(cell => cell.style.pointerEvents = 'none');
+        } else if (gameState.every(cell => cell)) {
+          message.textContent = 'It\'s a Draw!';
+        } else {
+          currentPlayer = currentPlayer === 'X' ? 'O' : 'X';
+          message.textContent = `Player ${currentPlayer}'s Turn`;
+        }
+      }
+    }
+
+    function checkWin() {
+      return winningCombos.some(combo =>
+        combo.every(index => gameState[index] === currentPlayer)
+      );
+    }
+
+    resetButton.addEventListener('click', createBoard);
+    createBoard();
+
+     // Hangman Script
+     const words = ["apple", "banana", "grape", "orange", "peach"];
+    let selectedWord = words[Math.floor(Math.random() * words.length)];
+    let guessedWord = Array(selectedWord.length).fill("_");
+    document.getElementById("word-display").textContent = guessedWord.join(" ");
+
+    document.getElementById("guess").addEventListener("input", function() {
+      const letter = this.value.toLowerCase();
+      this.value = "";
+      if (letter && selectedWord.includes(letter)) {
+        for (let i = 0; i < selectedWord.length; i++) {
+          if (selectedWord[i] === letter) guessedWord[i] = letter;
+        }
+      }
+      document.getElementById("word-display").textContent = guessedWord.join(" ");
+      if (!guessedWord.includes("_")) document.getElementById("hangman-status").textContent = "You won! 🎉";
+    });
+
+    document.getElementById("hangman-restart").addEventListener("click", function() {
+      selectedWord = words[Math.floor(Math.random() * words.length)];
+      guessedWord = Array(selectedWord.length).fill("_");
+      document.getElementById("word-display").textContent = guessedWord.join(" ");
+      document.getElementById("hangman-status").textContent = "";
+    });
+
+    // Snake Game Script
+    const canvas = document.getElementById("snakeCanvas");
+    const ctx = canvas.getContext("2d");
+    let snake = [{ x: 150, y: 150 }];
+    let direction = "RIGHT";
+    let food = { x: Math.floor(Math.random() * 10) * 30, y: Math.floor(Math.random() * 10) * 30 };
+
+    document.addEventListener("keydown", event => {
+      const key = event.key;
+      if (key === "ArrowUp" && direction !== "DOWN") direction = "UP";
+      else if (key === "ArrowDown" && direction !== "UP") direction = "DOWN";
+      else if (key === "ArrowLeft" && direction !== "RIGHT") direction = "LEFT";
+      else if (key === "ArrowRight" && direction !== "LEFT") direction = "RIGHT";
+    });
+
+    function update() {
+      const head = { ...snake[0] };
+      if (direction === "UP") head.y -= 30;
+      else if (direction === "DOWN") head.y += 30;
+      else if (direction === "LEFT") head.x -= 30;
+      else if (direction === "RIGHT") head.x += 30;
+      snake.unshift(head);
+      if (head.x === food.x && head.y === food.y) {
+        food = { x: Math.floor(Math.random() * 10) * 30, y: Math.floor(Math.random() * 10) * 30 };
+      } else {
+        snake.pop();
+      }
+    }
+
+    function draw() {
+      ctx.clearRect(0, 0, canvas.width, canvas.height);
+      ctx.fillStyle = "green";
+      snake.forEach(part => ctx.fillRect(part.x, part.y, 30, 30));
+      ctx.fillStyle = "red";
+      ctx.fillRect(food.x, food.y, 30, 30);
+    }
+
+    function gameLoop() {
+      update();
+      draw();
+      setTimeout(gameLoop, 200);
+    }
+
+    gameLoop();
+  </script>
+</body>
+</html>

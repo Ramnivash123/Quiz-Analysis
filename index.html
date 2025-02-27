@@ -1,0 +1,119 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>EduGreen - Learn and Grow</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
+</head>
+<body class="flex flex-col min-h-screen bg-white">
+    <!-- Navigation -->
+    <nav class="sticky top-0 bg-green-600 text-white shadow-md">
+        <div class="container mx-auto px-4">
+            <div class="flex justify-between items-center py-4">
+                <a class="text-2xl font-bold" href="#">Edu Learn</a>
+                
+                <div class="flex space-x-4">
+                    <a href="stu_signin.php" class="bg-white text-green-600 px-4 py-2 rounded-full hover:bg-green-50 transition">Student Login</a>
+                    <a href="tea_signin.php" class="bg-white text-green-600 px-4 py-2 rounded-full hover:bg-green-50 transition">Teacher Login</a>
+                </div>
+            </div>
+        </div>
+    </nav>
+
+    <!-- Hero Section -->
+    <section id="home" class="py-20 bg-green-50">
+        <div class="container mx-auto px-4">
+            <div class="grid md:grid-cols-2 gap-8 items-center">
+                <div>
+                    <h1 class="text-5xl font-bold mb-6 text-green-800">
+                        Learn, Grow, and Succeed with <span class="text-green-600">Edu Learn</span>
+                    </h1>
+                    <p class="text-gray-600 mb-8">
+                        EduGreen is your gateway to a world of knowledge. Whether you're a student or a teacher, our platform offers the tools and resources you need to achieve your educational goals.
+                    </p>
+                    <div class="flex space-x-4">
+                        <a href="stu_signup.php" class="bg-green-600 text-white px-8 py-3 rounded-full text-lg hover:bg-green-700 transition">Student Sign Up</a>
+                        <a href="tea_signup.php" class="bg-green-600 text-white px-8 py-3 rounded-full text-lg hover:bg-green-700 transition">Teacher Sign Up</a>
+                    </div>
+                </div>
+                <div>
+                    <img src="https://i0.wp.com/rollercoasteryears.com/wp-content/uploads/Thrive-During-Finals-.jpg?fit=1000%2C667&ssl=1" alt="Students learning" class="w-full rounded-lg shadow-lg">
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- About Section -->
+    <section id="about" class="py-20 bg-white">
+        <div class="container mx-auto px-4">
+            <h2 class="text-4xl font-bold text-center mb-12 text-green-800">About Edu Learn</h2>
+            <div class="grid md:grid-cols-2 gap-8 items-center">
+                <!-- Image moved to the left -->
+                <div class="relative order-1 md:order-1">
+                    <img src="https://storage.googleapis.com/gweb-uniblog-publish-prod/images/AR6A5482.width-1200.format-webp.webp" alt="Students taking quizzes online" class="w-full rounded-lg shadow-lg">
+                </div>
+                <!-- Content moved to the right -->
+                <div class="order-2 md:order-2">
+                    <p class="text-lg text-gray-600 mb-6">
+                        Edu Learn is an innovative quiz app designed to make learning engaging and effective. Our platform helps teachers create interactive quizzes while enabling students to attend them in a focused and enjoyable way.
+                    </p>
+                    <p class="text-lg text-gray-600 mb-8">
+                        With a mission to eliminate boredom and boost concentration, EduGreen transforms traditional quizzes into fun, interactive experiences. Our tools and features ensure that students stay engaged and teachers can easily track progress.
+                    </p>
+                    
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- Features Section -->
+    <section id="features" class="py-20 bg-green-50">
+        <div class="container mx-auto px-4">
+            <h2 class="text-4xl font-bold text-center mb-12 text-green-800">Why Choose Edu Learn?</h2>
+            <div class="grid md:grid-cols-3 gap-8">
+                <!-- Feature 1: Make Quiz -->
+                <div class="bg-white p-6 rounded-lg shadow-md">
+                    <div class="text-green-600 mb-4">
+                        <i class="fas fa-edit text-4xl"></i>
+                    </div>
+                    <h3 class="text-xl font-bold mb-4">Create Quizzes</h3>
+                    <p class="text-gray-600">Teachers can easily create interactive and engaging quizzes with customizable questions and formats.</p>
+                </div>
+                <!-- Feature 2: Attend Quiz -->
+                <div class="bg-white p-6 rounded-lg shadow-md">
+                    <div class="text-green-600 mb-4">
+                        <i class="fas fa-check-circle text-4xl"></i>
+                    </div>
+                    <h3 class="text-xl font-bold mb-4">Attend Quizzes</h3>
+                    <p class="text-gray-600">Students can attend quizzes in a fun and focused environment, designed to keep them engaged and motivated.</p>
+                </div>
+                <!-- Feature 3: Play Games -->
+                <div class="bg-white p-6 rounded-lg shadow-md">
+                    <div class="text-green-600 mb-4">
+                        <i class="fas fa-gamepad text-4xl"></i>
+                    </div>
+                    <h3 class="text-xl font-bold mb-4">Play Games</h3>
+                    <p class="text-gray-600">Make learning fun with gamified quizzes and interactive challenges that keep students entertained and focused.</p>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- Footer -->
+    <footer class="bg-green-800 text-white py-6">
+        <div class="container mx-auto px-4">
+            <div class="flex justify-between items-center">
+                <span>&copy; 2024 Edu Learn. All rights reserved.</span>
+                <div class="space-x-4">
+                    <a href="#" class="text-white hover:text-green-400"><i class="fab fa-facebook-f"></i></a>
+                    <a href="#" class="text-white hover:text-green-400"><i class="fab fa-twitter"></i></a>
+                    <a href="#" class="text-white hover:text-green-400"><i class="fab fa-instagram"></i></a>
+                    <a href="#" class="text-white hover:text-green-400"><i class="fab fa-linkedin-in"></i></a>
+                </div>
+            </div>
+        </div>
+    </footer>
+</body>
+</html>
