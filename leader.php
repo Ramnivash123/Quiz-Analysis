@@ -1,28 +1,80 @@
 <?php
+include 'db.php';
 session_start();
-include 'db.php'; // Ensure this file contains the PDO database connection logic
 
-// Fetch all unique subjects and exam titles for the dropdown
-$sql = "SELECT DISTINCT subject, exam_title FROM marks";
-$stmt = $conn->query($sql);
-$exams = $stmt->fetchAll(PDO::FETCH_ASSOC);
+// Retrieve teacher_name from session
+if (!isset($_SESSION['teacher_name'])) {
+    $teacherQuery = "SELECT DISTINCT teacher_name FROM exam WHERE teacher_id = ?";
+    $teacherStmt = $conn->prepare($teacherQuery);
+    $teacherStmt->execute([$_SESSION['teacher_id']]);
+    $teacherData = $teacherStmt->fetch(PDO::FETCH_ASSOC);
+    
+    if ($teacherData) {
+        $_SESSION['teacher_name'] = $teacherData['teacher_name'];
+    }
+}
 
-$leaderboard = [];
+$teacherName = $_SESSION['teacher_name'] ?? '';
 
-// Handle form submission to filter by subject and exam title
-if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['filter'])) {
-    $subject = $_POST['subject'];
-    $exam_title = $_POST['exam_title'];
+// Fetch unique exam titles and subjects
+$examQuery = "SELECT DISTINCT exam_title FROM exam WHERE teacher_name = ?";
+$examStmt = $conn->prepare($examQuery);
+$examStmt->execute([$teacherName]);
+$examTitles = $examStmt->fetchAll(PDO::FETCH_ASSOC);
 
-    // Fetch leaderboard data based on selected subject and exam title
-    $sql = "SELECT student_name, score, completion_time FROM marks 
-            WHERE subject = :subject AND exam_title = :exam_title 
-            ORDER BY score DESC, completion_time ASC";
+$subjectQuery = "SELECT DISTINCT subject FROM exam WHERE teacher_name = ?";
+$subjectStmt = $conn->prepare($subjectQuery);
+$subjectStmt->execute([$teacherName]);
+$subjects = $subjectStmt->fetchAll(PDO::FETCH_ASSOC);
+
+// Handle form submission
+$examTitle = $_POST['exam_title'] ?? '';
+$subject = $_POST['subject'] ?? '';
+
+$showResults = (!empty($examTitle) && !empty($subject));
+$result = [];
+$result2 = [];
+
+if ($showResults) {
+    // Query marks table
+    $sql = "SELECT m.student_name, m.score, m.completion_time 
+            FROM marks m
+            JOIN exam e ON m.exam_title = e.exam_title AND m.subject = e.subject
+            WHERE e.teacher_name = ? AND m.exam_title = ? AND m.subject = ?";
     $stmt = $conn->prepare($sql);
-    $stmt->bindParam(':subject', $subject);
-    $stmt->bindParam(':exam_title', $exam_title);
-    $stmt->execute();
-    $leaderboard = $stmt->fetchAll(PDO::FETCH_ASSOC);
+    $stmt->execute([$teacherName, $examTitle, $subject]);
+    $result = $stmt->fetchAll(PDO::FETCH_ASSOC);
+
+    // Query marks2 table
+    $sql2 = "SELECT m.student_name, m.score, m.completion_time 
+            FROM marks2 m
+            JOIN exam e ON m.exam_title = e.exam_title AND m.subject = e.subject
+            WHERE e.teacher_name = ? AND m.exam_title = ? AND m.subject = ?";
+    $stmt2 = $conn->prepare($sql2);
+    $stmt2->execute([$teacherName, $examTitle, $subject]);
+    $result2 = $stmt2->fetchAll(PDO::FETCH_ASSOC);
+}
+
+// Prepare data for Chart.js
+$students = [];
+$quizScores = [];
+$enhancedScores = [];
+$quizTimes = [];
+$enhancedTimes = [];
+
+foreach ($result as $row) {
+    $students[$row['student_name']] = $row;
+}
+foreach ($result2 as $row) {
+    $students[$row['student_name']] = array_merge($students[$row['student_name']] ?? [], $row);
+}
+
+// Populate arrays
+foreach ($students as $student => $data) {
+    $quizScores[] = $data['score'] ?? 0;
+    $enhancedScores[] = $data['score'] ?? 0;
+    $quizTimes[] = $data['completion_time'] ?? 0;
+    $enhancedTimes[] = $data['completion_time'] ?? 0;
 }
 ?>
 
@@ -33,107 +85,157 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['filter'])) {
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Leaderboard</title>
     <script src="https://cdn.tailwindcss.com"></script>
-    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 </head>
-<body class="bg-green-50 min-h-screen">
-    <nav class="sticky top-0 bg-green-600 text-white shadow-md">
-        <div class="container mx-auto px-4">
-            <div class="flex justify-between items-center py-4">
-                <a class="text-2xl font-bold" href="#">Edu Learn</a>
-                <a href="teacherr.php" class="flex items-center text-gray-700 hover:text-green-600 transition-colors">
-                    <i class="fas fa-user mr-2"></i>
-                    <span>Profile</span>
-                </a>
+<body class="bg-green-50 flex flex-col min-h-screen">
+
+    <!-- Navbar -->
+    <nav class="sticky top-0 bg-green-700 text-white shadow-md">
+        <div class="container mx-auto px-6 py-4 flex justify-between items-center">
+            <a class="text-2xl font-bold tracking-wide" href="#">Edu Learn</a>
+            <div class="flex items-center">
+                <a href="teacherr.php" class="text-white hover:text-gray-200 transition">Profile</a>
             </div>
         </div>
     </nav>
-    <div class="container mx-auto px-4 py-8">
-        <div class="bg-white rounded-xl shadow-lg p-8 max-w-3xl mx-auto">
-            <h1 class="text-3xl font-bold text-green-800 text-center mb-6">Leaderboard</h1>
 
-            <!-- Form to filter by subject and exam title -->
-            <form method="post" action="<?php echo htmlspecialchars($_SERVER["PHP_SELF"]); ?>">
-                <div class="space-y-6">
-                    <div>
-                        <label for="subject" class="block text-sm font-medium text-green-700 mb-2">Subject:</label>
-                        <select id="subject" name="subject" required
-                                class="w-full px-4 py-2 border border-green-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500 focus:border-green-500">
-                            <option value="">Select Subject</option>
-                            <?php foreach ($exams as $exam): ?>
-                                <option value="<?php echo htmlspecialchars($exam['subject']); ?>">
-                                    <?php echo htmlspecialchars($exam['subject']); ?>
-                                </option>
-                            <?php endforeach; ?>
-                        </select>
-                    </div>
-                    <div>
-                        <label for="exam_title" class="block text-sm font-medium text-green-700 mb-2">Exam Title:</label>
-                        <select id="exam_title" name="exam_title" required
-                                class="w-full px-4 py-2 border border-green-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500 focus:border-green-500">
-                            <option value="">Select Exam Title</option>
-                            <?php foreach ($exams as $exam): ?>
-                                <option value="<?php echo htmlspecialchars($exam['exam_title']); ?>">
-                                    <?php echo htmlspecialchars($exam['exam_title']); ?>
-                                </option>
-                            <?php endforeach; ?>
-                        </select>
-                    </div>
-                </div>
+    <!-- Leaderboard Section -->
+    <div class="flex-grow flex flex-col items-center px-4 py-6">
+        <div class="w-full max-w-4xl bg-white shadow-lg rounded-lg p-6">
+            <h2 class="text-2xl font-bold text-green-700 text-center mb-6">Leaderboard</h2>
+            
+            <!-- Selection Form -->
+            <form method="POST" class="mb-6 flex flex-col md:flex-row gap-4 items-center justify-center">
+                <select name="exam_title" class="p-2 border border-green-300 rounded-md" required>
+                    <option value="">Select Exam Title</option>
+                    <?php foreach ($examTitles as $row) { ?>
+                        <option value="<?= $row['exam_title']; ?>" <?= ($examTitle == $row['exam_title']) ? 'selected' : ''; ?>>
+                            <?= $row['exam_title']; ?>
+                        </option>
+                    <?php } ?>
+                </select>
 
-                <!-- Filter Button -->
-                <input type="submit" name="filter" value="Filter"
-                       class="w-full bg-green-600 text-white px-6 py-2 rounded-lg mt-6 hover:bg-green-700 transition-colors cursor-pointer">
+                <select name="subject" class="p-2 border border-green-300 rounded-md" required>
+                    <option value="">Select Subject</option>
+                    <?php foreach ($subjects as $row) { ?>
+                        <option value="<?= $row['subject']; ?>" <?= ($subject == $row['subject']) ? 'selected' : ''; ?>>
+                            <?= $row['subject']; ?>
+                        </option>
+                    <?php } ?>
+                </select>
+
+                <button type="submit" class="bg-green-700 text-white px-4 py-2 rounded-md hover:bg-green-800 transition">
+                    Show Marks
+                </button>
             </form>
 
-            <!-- Display Leaderboard -->
-            <?php if (!empty($leaderboard)): ?>
-                <div class="mt-8">
-                    <h2 class="text-2xl font-bold text-green-800 mb-4">Leaderboard for <?php echo htmlspecialchars($_POST['subject']); ?> - <?php echo htmlspecialchars($_POST['exam_title']); ?></h2>
-                    <canvas id="leaderboardChart"></canvas>
+            <?php if ($showResults) { ?>
+                <!-- Leaderboard Table for Quiz Marks -->
+                <h3 class="text-xl font-bold text-green-700 text-center mt-6">Quiz Marks</h3>
+                <div class="overflow-x-auto mb-6">
+                    <table class="w-full border-collapse border border-green-300 rounded-lg">
+                        <thead>
+                            <tr class="bg-green-700 text-white text-left">
+                                <th class="px-5 py-3">Student Name</th>
+                                <th class="px-5 py-3">Score</th>
+                                <th class="px-5 py-3">Completion Time</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <?php
+                            if (!empty($result)) {
+                                foreach ($result as $row) {
+                                    echo "<tr class='border-b border-green-200 hover:bg-green-100 transition'>";
+                                    echo "<td class='px-5 py-3 text-gray-900 font-medium'>{$row['student_name']}</td>";
+                                    echo "<td class='px-5 py-3 text-gray-900'>{$row['score']}</td>";
+                                    echo "<td class='px-5 py-3 text-gray-900'>{$row['completion_time']}</td>";
+                                    echo "</tr>";
+                                }
+                            } else {
+                                echo "<tr><td colspan='3' class='px-5 py-3 text-center text-gray-900'>No records found</td></tr>";
+                            }
+                            ?>
+                        </tbody>
+                    </table>
                 </div>
 
-                <!-- Chart.js Script -->
-                <script>
-                    const leaderboardData = <?php echo json_encode($leaderboard); ?>;
-
-                    const labels = leaderboardData.map(entry => entry.student_name);
-                    const scores = leaderboardData.map(entry => entry.score);
-                    const completionTimes = leaderboardData.map(entry => Math.floor(entry.completion_time / 60)); // Convert to minutes
-
-                    const ctx = document.getElementById('leaderboardChart').getContext('2d');
-                    new Chart(ctx, {
-                        type: 'bar',
-                        data: {
-                            labels: labels,
-                            datasets: [
-                                {
-                                    label: 'Score',
-                                    data: scores,
-                                    backgroundColor: 'rgba(75, 192, 192, 0.2)',
-                                    borderColor: 'rgba(75, 192, 192, 1)',
-                                    borderWidth: 1
-                                },
-                                {
-                                    label: 'Completion Time (minutes)',
-                                    data: completionTimes,
-                                    backgroundColor: 'rgba(255, 99, 132, 0.2)',
-                                    borderColor: 'rgba(255, 99, 132, 1)',
-                                    borderWidth: 1
+                <!-- Leaderboard Table for Enhanced Quiz Marks -->
+                <h3 class="text-xl font-bold text-green-700 text-center mt-6">Enhanced Quiz Marks</h3>
+                <div class="overflow-x-auto">
+                    <table class="w-full border-collapse border border-green-300 rounded-lg">
+                        <thead>
+                            <tr class="bg-green-700 text-white text-left">
+                                <th class="px-5 py-3">Student Name</th>
+                                <th class="px-5 py-3">Score</th>
+                                <th class="px-5 py-3">Completion Time</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <?php
+                            if (!empty($result2)) {
+                                foreach ($result2 as $row) {
+                                    echo "<tr class='border-b border-green-200 hover:bg-green-100 transition'>";
+                                    echo "<td class='px-5 py-3 text-gray-900 font-medium'>{$row['student_name']}</td>";
+                                    echo "<td class='px-5 py-3 text-gray-900'>{$row['score']}</td>";
+                                    echo "<td class='px-5 py-3 text-gray-900'>{$row['completion_time']}</td>";
+                                    echo "</tr>";
                                 }
-                            ]
-                        },
-                        options: {
-                            indexAxis: 'y', // Horizontal bar chart
-                            scales: {
-                                x: {
-                                    beginAtZero: true
-                                }
+                            } else {
+                                echo "<tr><td colspan='3' class='px-5 py-3 text-center text-gray-900'>No records found</td></tr>";
                             }
-                        }
-                    });
-                </script>
-            <?php endif; ?>
+                            ?>
+                        </tbody>
+                    </table>
+                </div>
+            <?php } else { ?>
+                <p class="text-center text-gray-700 mt-6">Please select both Exam Title and Subject to view marks.</p>
+            <?php } ?>
         </div>
+
+
+        <!-- Chart.js -->
+        <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+
+        <!-- Chart Section -->
+        <div class="w-full max-w-4xl mx-auto mt-8 bg-white shadow-lg rounded-lg p-6">
+            <h3 class="text-xl font-bold text-green-700 text-center">Performance Comparison</h3>
+            <canvas id="scoreChart"></canvas>
+            <canvas id="timeChart" class="mt-6"></canvas>
+        </div>
+
+        <script>
+            const ctx1 = document.getElementById('scoreChart').getContext('2d');
+            const ctx2 = document.getElementById('timeChart').getContext('2d');
+
+            const students = <?= json_encode(array_keys($students)) ?>;
+            const quizScores = <?= json_encode($quizScores) ?>;
+            const enhancedScores = <?= json_encode($enhancedScores) ?>;
+            const quizTimes = <?= json_encode($quizTimes) ?>;
+            const enhancedTimes = <?= json_encode($enhancedTimes) ?>;
+
+            new Chart(ctx1, {
+                type: 'bar',
+                data: {
+                    labels: students,
+                    datasets: [
+                        { label: 'Quiz Marks', data: quizScores, backgroundColor: 'rgba(75, 192, 192, 0.6)' },
+                        { label: 'Enhanced Quiz Marks', data: enhancedScores, backgroundColor: 'rgba(255, 99, 132, 0.6)' }
+                    ]
+                },
+                options: { responsive: true, scales: { y: { beginAtZero: true } } }
+            });
+
+            new Chart(ctx2, {
+                type: 'line',
+                data: {
+                    labels: students,
+                    datasets: [
+                        { label: 'Quiz Completion Time', data: quizTimes, borderColor: 'blue', fill: false },
+                        { label: 'Enhanced Quiz Completion Time', data: enhancedTimes, borderColor: 'red', fill: false }
+                    ]
+                },
+                options: { responsive: true, scales: { y: { beginAtZero: true } } }
+            });
+        </script>
     </div>
 </body>
 </html>
