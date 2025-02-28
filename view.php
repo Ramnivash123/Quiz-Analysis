@@ -1,10 +1,19 @@
 <?php
 session_start();
-include 'db.php'; // Ensure this file contains the PDO database connection logic
+include 'db.php'; // Ensure this contains the PDO connection
 
-// Fetch all unique subjects and exam titles for the dropdown
-$sql = "SELECT DISTINCT subject, exam_title FROM exam";
-$stmt = $conn->query($sql);
+// Ensure teacher is logged in
+if (!isset($_SESSION['teacher_name'])) {
+    die("Access Denied. Please log in.");
+}
+
+$teacher_name = $_SESSION['teacher_name'];
+
+// Fetch unique subjects and exam titles for the logged-in teacher
+$sql = "SELECT DISTINCT subject, exam_title FROM exam WHERE teacher_name = :teacher_name";
+$stmt = $conn->prepare($sql);
+$stmt->bindParam(':teacher_name', $teacher_name);
+$stmt->execute();
 $exams = $stmt->fetchAll(PDO::FETCH_ASSOC);
 
 $selected_exam = null;
@@ -15,10 +24,11 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['view_exam'])) {
     $exam_title = $_POST['exam_title'];
 
     // Fetch the selected exam details
-    $sql = "SELECT * FROM exam WHERE subject = :subject AND exam_title = :exam_title";
+    $sql = "SELECT * FROM exam WHERE subject = :subject AND exam_title = :exam_title AND teacher_name = :teacher_name";
     $stmt = $conn->prepare($sql);
     $stmt->bindParam(':subject', $subject);
     $stmt->bindParam(':exam_title', $exam_title);
+    $stmt->bindParam(':teacher_name', $teacher_name);
     $stmt->execute();
     $selected_exam = $stmt->fetch(PDO::FETCH_ASSOC);
 }
@@ -38,12 +48,12 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['view_exam'])) {
             <div class="flex justify-between items-center py-4">
                 <a class="text-2xl font-bold" href="#">Edu Learn</a>
                 <a href="teacherr.php" class="flex items-center text-gray-700 hover:text-green-600 transition-colors">
-                    <i class="fas fa-user mr-2"></i>
                     <span>Profile</span>
                 </a>
             </div>
         </div>
     </nav>
+
     <div class="container mx-auto px-4 py-8">
         <div class="bg-white rounded-xl shadow-lg p-8 max-w-3xl mx-auto">
             <h1 class="text-3xl font-bold text-green-800 text-center mb-6">View Exam Details</h1>
@@ -54,7 +64,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['view_exam'])) {
                     <div>
                         <label for="subject" class="block text-sm font-medium text-green-700 mb-2">Subject:</label>
                         <select id="subject" name="subject" required
-                                class="w-full px-4 py-2 border border-green-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500 focus:border-green-500">
+                                class="w-full px-4 py-2 border border-green-300 rounded-lg focus:ring-2 focus:ring-green-500">
                             <option value="">Select Subject</option>
                             <?php foreach ($exams as $exam): ?>
                                 <option value="<?php echo htmlspecialchars($exam['subject']); ?>">
@@ -66,7 +76,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['view_exam'])) {
                     <div>
                         <label for="exam_title" class="block text-sm font-medium text-green-700 mb-2">Exam Title:</label>
                         <select id="exam_title" name="exam_title" required
-                                class="w-full px-4 py-2 border border-green-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500 focus:border-green-500">
+                                class="w-full px-4 py-2 border border-green-300 rounded-lg focus:ring-2 focus:ring-green-500">
                             <option value="">Select Exam Title</option>
                             <?php foreach ($exams as $exam): ?>
                                 <option value="<?php echo htmlspecialchars($exam['exam_title']); ?>">
@@ -77,9 +87,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['view_exam'])) {
                     </div>
                 </div>
 
-                <!-- View Exam Button -->
                 <input type="submit" name="view_exam" value="View Exam"
-                       class="w-full bg-green-600 text-white px-6 py-2 rounded-lg mt-6 hover:bg-green-700 transition-colors cursor-pointer">
+                       class="w-full bg-green-600 text-white px-6 py-2 rounded-lg mt-6 hover:bg-green-700 cursor-pointer">
             </form>
 
             <!-- Display selected exam details -->
