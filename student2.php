@@ -4,6 +4,14 @@ include 'db.php'; // Ensure this file contains the PDO database connection logic
 
 $student_name = $_SESSION['student_name'] ?? '';
 
+// Handle restart request
+if (isset($_GET['restart'])) {
+    unset($_SESSION['ongoing_exam']); // Clear ongoing exam session
+    session_write_close(); // Save session changes
+    header("Location: " . $_SERVER['PHP_SELF']); // Redirect to the same page
+    exit();
+}
+
 // Fetch all unique subjects and exam titles for the dropdown
 $sql = "SELECT DISTINCT subject, exam_title FROM exam";
 $stmt = $conn->query($sql);
@@ -13,6 +21,36 @@ $selected_exam = null;
 $questions = [];
 $quiz_completed = false;
 
+// Check if there's an ongoing exam in the session
+if (!$selected_exam && !$quiz_completed && isset($_SESSION['ongoing_exam'])) {
+    $subject = $_SESSION['ongoing_exam']['subject'];
+    $exam_title = $_SESSION['ongoing_exam']['exam_title'];
+
+    // Check if the quiz was already completed
+    $sql = "SELECT * FROM marks2 WHERE student_name = :student_name AND subject = :subject AND exam_title = :exam_title";
+    $stmt = $conn->prepare($sql);
+    $stmt->execute([
+        ':student_name' => $student_name,
+        ':subject' => $subject,
+        ':exam_title' => $exam_title
+    ]);
+    $quiz_completed = $stmt->fetch(PDO::FETCH_ASSOC);
+
+    if (!$quiz_completed) {
+        // Reload the exam details
+        $sql = "SELECT * FROM exam WHERE subject = :subject AND exam_title = :exam_title";
+        $stmt = $conn->prepare($sql);
+        $stmt->execute([':subject' => $subject, ':exam_title' => $exam_title]);
+        $selected_exam = $stmt->fetch(PDO::FETCH_ASSOC);
+
+        if ($selected_exam) {
+            $questions = json_decode($selected_exam['questions'], true);
+        }
+    } else {
+        unset($_SESSION['ongoing_exam']);
+    }
+}
+
 // Handle form submission to select exam
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['start_exam'])) {
     $subject = $_POST['subject'];
@@ -21,19 +59,24 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['start_exam'])) {
     // Check if the student has already completed this quiz
     $sql = "SELECT * FROM marks2 WHERE student_name = :student_name AND subject = :subject AND exam_title = :exam_title";
     $stmt = $conn->prepare($sql);
-    $stmt->bindParam(':student_name', $student_name);
-    $stmt->bindParam(':subject', $subject);
-    $stmt->bindParam(':exam_title', $exam_title);
-    $stmt->execute();
+    $stmt->execute([
+        ':student_name' => $student_name,
+        ':subject' => $subject,
+        ':exam_title' => $exam_title
+    ]);
     $quiz_completed = $stmt->fetch(PDO::FETCH_ASSOC);
 
     if (!$quiz_completed) {
+        // Store the selected exam in the session
+        $_SESSION['ongoing_exam'] = [
+            'subject' => $subject,
+            'exam_title' => $exam_title
+        ];
+
         // Fetch the selected exam details
         $sql = "SELECT * FROM exam WHERE subject = :subject AND exam_title = :exam_title";
         $stmt = $conn->prepare($sql);
-        $stmt->bindParam(':subject', $subject);
-        $stmt->bindParam(':exam_title', $exam_title);
-        $stmt->execute();
+        $stmt->execute([':subject' => $subject, ':exam_title' => $exam_title]);
         $selected_exam = $stmt->fetch(PDO::FETCH_ASSOC);
 
         if ($selected_exam) {
@@ -60,15 +103,18 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['submit_quiz'])) {
     $sql = "INSERT INTO marks2 (student_name, exam_title, subject, score, completion_time) 
             VALUES (:student_name, :exam_title, :subject, :score, :completion_time)";
     $stmt = $conn->prepare($sql);
-    $stmt->bindParam(':student_name', $student_name);
-    $stmt->bindParam(':exam_title', $exam_title);
-    $stmt->bindParam(':subject', $subject);
-    $stmt->bindParam(':score', $score);
-    $stmt->bindParam(':completion_time', $completion_time);
+    $stmt->execute([
+        ':student_name' => $student_name,
+        ':exam_title' => $exam_title,
+        ':subject' => $subject,
+        ':score' => $score,
+        ':completion_time' => $completion_time
+    ]);
 
-    if ($stmt->execute()) {
+    if ($stmt->rowCount() > 0) {
         $success = "Quiz submitted successfully! Your score: $score";
         $quiz_completed = true; // Mark the quiz as completed
+        unset($_SESSION['ongoing_exam']); // Clear ongoing exam
     } else {
         $error = "Error submitting quiz: " . $stmt->errorInfo()[2];
     }
@@ -100,7 +146,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['submit_quiz'])) {
     <!-- Main Container -->
     <div class="container mx-auto px-4 py-10 flex-1">
         <div class="bg-white rounded-xl shadow-lg p-10 max-w-3xl mx-auto">
-            <h1 class="text-3xl font-extrabold text-green-800 text-center mb-6">📚 Attend Quiz</h1>
+            <h1 class="text-3xl font-extrabold text-green-800 text-center mb-6">Attend Quiz</h1>
 
             <!-- Messages -->
             <?php if (isset($error)): ?>
@@ -148,15 +194,15 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['submit_quiz'])) {
             <!-- Quiz Questions -->
             <?php if ($selected_exam && !isset($_POST['submit_quiz']) && !$quiz_completed): ?>
                 <div class="text-center text-2xl font-bold text-green-800 mt-6">
-                    ⏳ Time Left: <span id="timer">00:00</span>
+                     Time: <span id="timer">00:00</span>
                 </div>
 
                 <div class="flex justify-between items-center py-4">
-                    <button onclick="window.location.href='games.html'" class="flex items-center bg-green-700 text-white px-4 py-2 rounded-lg mt-4 hover:bg-green-800 transition-colors">
+                    <button onclick="window.open('games.html', '_blank');" class="flex items-center bg-green-700 text-white px-4 py-2 rounded-lg mt-4 hover:bg-green-800 transition-colors">
                         <i class="fas fa-gamepad mr-2"></i> Play Games
                     </button>
 
-                    <button onclick="window.location.href='videos.php'" class="flex items-center bg-green-700 text-white px-4 py-2 rounded-lg mt-4 hover:bg-green-800 transition-colors">
+                    <button onclick="window.open('videos.php', '_blank');" class="flex items-center bg-green-700 text-white px-4 py-2 rounded-lg mt-4 hover:bg-green-800 transition-colors">
                         <i class="fas fa-video mr-2"></i> Watch Videos
                     </button>
                 </div>
@@ -168,8 +214,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['submit_quiz'])) {
 
                     <div class="space-y-6">
                         <?php foreach ($questions as $index => $question): ?>
-                            <div class="bg-green-100 p-6 rounded-lg border-l-4 border-green-600 shadow-sm">
-                                <p class="text-lg font-medium text-green-800 mb-4">❓ Question <?php echo $index + 1; ?>: <?php echo htmlspecialchars($question['question']); ?></p>
+                            <div class="question-container bg-green-100 p-6 rounded-lg border-l-4 border-green-600 shadow-sm">
+                                <p class="text-lg font-medium text-green-800 mb-4">
+                                    Question <?php echo $index + 1; ?>: <?php echo htmlspecialchars($question['question']); ?>
+                                </p>
                                 <?php foreach ($question['options'] as $optIndex => $option): ?>
                                     <label class="block mb-2 cursor-pointer flex items-center">
                                         <input type="radio" name="answers[<?php echo $index; ?>]" value="<?php echo $optIndex + 1; ?>" required class="mr-2">
@@ -188,14 +236,52 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['submit_quiz'])) {
 
                 <!-- Timer Script -->
                 <script>
-                    let startTime = Date.now();
-                    let timerInterval = setInterval(() => {
+                    let startTime;
+                    let timerInterval;
+                    let storedElapsed = sessionStorage.getItem('quizElapsedTime');
+
+                    // Function to update the timer display
+                    function updateTimer() {
                         let elapsedTime = Math.floor((Date.now() - startTime) / 1000);
+                        sessionStorage.setItem('quizElapsedTime', elapsedTime);
                         let minutes = Math.floor(elapsedTime / 60);
                         let seconds = elapsedTime % 60;
                         document.getElementById('timer').textContent = `${String(minutes).padStart(2, '0')}:${String(seconds).padStart(2, '0')}`;
                         document.getElementById('completion_time').value = elapsedTime;
-                    }, 1000);
+                    }
+
+                    // Initialize timer
+                    if (storedElapsed) {
+                        startTime = Date.now() - storedElapsed * 1000;
+                    } else {
+                        startTime = Date.now();
+                    }
+                    timerInterval = setInterval(updateTimer, 1000);
+
+                    // Pause timer when tab is inactive
+                    document.addEventListener('visibilitychange', function() {
+                        if (document.hidden) {
+                            clearInterval(timerInterval);
+                            let elapsedTime = Math.floor((Date.now() - startTime) / 1000);
+                            sessionStorage.setItem('quizElapsedTime', elapsedTime);
+                        } else {
+                            let storedElapsed = sessionStorage.getItem('quizElapsedTime') || 0;
+                            startTime = Date.now() - storedElapsed * 1000;
+                            timerInterval = setInterval(updateTimer, 1000);
+                        }
+                    });
+
+                    // Save elapsed time when leaving the page
+                    window.addEventListener('beforeunload', function() {
+                        let elapsedTime = Math.floor((Date.now() - startTime) / 1000);
+                        sessionStorage.setItem('quizElapsedTime', elapsedTime);
+                    });
+
+                    // Clear storage on quiz submit
+                    document.querySelector('form').addEventListener('submit', function() {
+                        sessionStorage.removeItem('quizElapsedTime');
+                        clearInterval(timerInterval);
+                    });
                 </script>
             <?php endif; ?>
 
