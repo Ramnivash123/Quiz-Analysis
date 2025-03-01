@@ -30,10 +30,13 @@ $subjects = $subjectStmt->fetchAll(PDO::FETCH_ASSOC);
 // Handle form submission
 $examTitle = $_POST['exam_title'] ?? '';
 $subject = $_POST['subject'] ?? '';
+$selectedStudent = $_POST['student_name'] ?? '';
 
 $showResults = (!empty($examTitle) && !empty($subject));
 $result = [];
 $result2 = [];
+$completionTimes = []; // Store quiz and enhanced quiz completion times
+$students = [];
 
 if ($showResults) {
     // Query marks table
@@ -53,28 +56,28 @@ if ($showResults) {
     $stmt2 = $conn->prepare($sql2);
     $stmt2->execute([$teacherName, $examTitle, $subject]);
     $result2 = $stmt2->fetchAll(PDO::FETCH_ASSOC);
-}
 
-// Prepare data for Chart.js
-$students = [];
-$quizScores = [];
-$enhancedScores = [];
-$quizTimes = [];
-$enhancedTimes = [];
+    // Get unique student names
+    $students = array_unique(array_merge(
+        array_column($result, 'student_name'),
+        array_column($result2, 'student_name')
+    ));
 
-foreach ($result as $row) {
-    $students[$row['student_name']] = $row;
-}
-foreach ($result2 as $row) {
-    $students[$row['student_name']] = array_merge($students[$row['student_name']] ?? [], $row);
-}
-
-// Populate arrays
-foreach ($students as $student => $data) {
-    $quizScores[] = $data['score'] ?? 0;
-    $enhancedScores[] = $data['score'] ?? 0;
-    $quizTimes[] = $data['completion_time'] ?? 0;
-    $enhancedTimes[] = $data['completion_time'] ?? 0;
+    // Prepare data for the chart
+    if (!empty($selectedStudent)) {
+        $timeDifferences = []; // Store student names and their time differences
+        foreach ($result as $quizRow) {
+            foreach ($result2 as $enhancedRow) {
+                if ($quizRow['student_name'] === $enhancedRow['student_name']) {
+                    $timeDifference = abs($quizRow['completion_time'] - $enhancedRow['completion_time']);
+                    $timeDifferences[] = [
+                        'student_name' => $quizRow['student_name'],
+                        'time_difference' => $timeDifference
+                    ];
+                }
+            }
+        }
+    }
 }
 ?>
 
@@ -85,6 +88,7 @@ foreach ($students as $student => $data) {
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Leaderboard</title>
     <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script> <!-- Include Chart.js -->
 </head>
 <body class="bg-green-50 flex flex-col min-h-screen">
 
@@ -119,6 +123,15 @@ foreach ($students as $student => $data) {
                     <?php foreach ($subjects as $row) { ?>
                         <option value="<?= $row['subject']; ?>" <?= ($subject == $row['subject']) ? 'selected' : ''; ?>>
                             <?= $row['subject']; ?>
+                        </option>
+                    <?php } ?>
+                </select>
+
+                <select name="student_name" class="p-2 border border-green-300 rounded-md">
+                    <option value="">Select Student</option>
+                    <?php foreach ($students as $student) { ?>
+                        <option value="<?= $student; ?>" <?= ($selectedStudent == $student) ? 'selected' : ''; ?>>
+                            <?= $student; ?>
                         </option>
                     <?php } ?>
                 </select>
@@ -186,56 +199,71 @@ foreach ($students as $student => $data) {
                         </tbody>
                     </table>
                 </div>
+
+                <!-- Scatter Chart for Quiz vs Enhanced Quiz Completion Times -->
+                <!-- ... (rest of your HTML code) -->
+
+                <?php if (!empty($selectedStudent)) { ?>
+                    <h3 class="text-xl font-bold text-green-700 text-center mt-6">Time Difference Between Quiz and Enhanced Quiz for <?= $selectedStudent; ?></h3>
+                    <div class="mt-6">
+                        <canvas id="timeDifferenceChart"></canvas>
+                    </div>
+
+                    <script>
+                        // Prepare data for the chart
+                        const timeDifferences = <?php echo json_encode($timeDifferences); ?>;
+
+                        const studentNames = timeDifferences.map(item => item.student_name);
+                        const timeDiffs = timeDifferences.map(item => item.time_difference);
+
+                        // Render the bar chart
+                        const ctx = document.getElementById('timeDifferenceChart').getContext('2d');
+                        new Chart(ctx, {
+                            type: 'bar', // Use a bar chart for better readability
+                            data: {
+                                labels: studentNames, // Student names on the x-axis
+                                datasets: [{
+                                    label: 'Time Difference (seconds)',
+                                    data: timeDiffs, // Time differences on the y-axis
+                                    backgroundColor: 'rgba(75, 192, 192, 0.2)',
+                                    borderColor: 'rgba(75, 192, 192, 1)',
+                                    borderWidth: 2
+                                }]
+                            },
+                            options: {
+                                scales: {
+                                    x: {
+                                        title: {
+                                            display: true,
+                                            text: 'Student Name'
+                                        }
+                                    },
+                                    y: {
+                                        title: {
+                                            display: true,
+                                            text: 'Time Difference (seconds)'
+                                        }
+                                    }
+                                },
+                                plugins: {
+                                    tooltip: {
+                                        callbacks: {
+                                            label: function(context) {
+                                                const studentName = context.label;
+                                                const timeDiff = context.raw;
+                                                return `${studentName}: ${timeDiff}s`;
+                                            }
+                                        }
+                                    }
+                                }
+                            }
+                        });
+                    </script>
+                <?php } ?>
             <?php } else { ?>
                 <p class="text-center text-gray-700 mt-6">Please select both Exam Title and Subject to view marks.</p>
             <?php } ?>
         </div>
-
-
-        <!-- Chart.js -->
-        <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
-
-        <!-- Chart Section -->
-        <div class="w-full max-w-4xl mx-auto mt-8 bg-white shadow-lg rounded-lg p-6">
-            <h3 class="text-xl font-bold text-green-700 text-center">Performance Comparison</h3>
-            <canvas id="scoreChart"></canvas>
-            <canvas id="timeChart" class="mt-6"></canvas>
-        </div>
-
-        <script>
-            const ctx1 = document.getElementById('scoreChart').getContext('2d');
-            const ctx2 = document.getElementById('timeChart').getContext('2d');
-
-            const students = <?= json_encode(array_keys($students)) ?>;
-            const quizScores = <?= json_encode($quizScores) ?>;
-            const enhancedScores = <?= json_encode($enhancedScores) ?>;
-            const quizTimes = <?= json_encode($quizTimes) ?>;
-            const enhancedTimes = <?= json_encode($enhancedTimes) ?>;
-
-            new Chart(ctx1, {
-                type: 'bar',
-                data: {
-                    labels: students,
-                    datasets: [
-                        { label: 'Quiz Marks', data: quizScores, backgroundColor: 'rgba(75, 192, 192, 0.6)' },
-                        { label: 'Enhanced Quiz Marks', data: enhancedScores, backgroundColor: 'rgba(255, 99, 132, 0.6)' }
-                    ]
-                },
-                options: { responsive: true, scales: { y: { beginAtZero: true } } }
-            });
-
-            new Chart(ctx2, {
-                type: 'line',
-                data: {
-                    labels: students,
-                    datasets: [
-                        { label: 'Quiz Completion Time', data: quizTimes, borderColor: 'blue', fill: false },
-                        { label: 'Enhanced Quiz Completion Time', data: enhancedTimes, borderColor: 'red', fill: false }
-                    ]
-                },
-                options: { responsive: true, scales: { y: { beginAtZero: true } } }
-            });
-        </script>
     </div>
 </body>
 </html>
