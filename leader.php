@@ -34,11 +34,13 @@ $subject = $_POST['subject'] ?? '';
 $showResults = (!empty($examTitle) && !empty($subject)); // Fixed syntax error
 $quizTimesAssoc = [];
 $enhancedTimesAssoc = [];
+$quizScoresAssoc = [];
+$enhancedScoresAssoc = [];
 $students = [];
 
 if ($showResults) {
     // Query marks tables and create associative arrays
-    $sql = "SELECT m.student_name, m.completion_time 
+    $sql = "SELECT m.student_name, m.completion_time, m.score 
             FROM marks m
             JOIN exam e ON m.exam_title = e.exam_title AND m.subject = e.subject
             WHERE e.teacher_name = ? AND m.exam_title = ? AND m.subject = ?";
@@ -46,9 +48,10 @@ if ($showResults) {
     $stmt->execute([$teacherName, $examTitle, $subject]);
     while ($row = $stmt->fetch(PDO::FETCH_ASSOC)) {
         $quizTimesAssoc[$row['student_name']] = round($row['completion_time'] / 60, 2);
+        $quizScoresAssoc[$row['student_name']] = $row['score'];
     }
 
-    $sql2 = "SELECT m.student_name, m.completion_time 
+    $sql2 = "SELECT m.student_name, m.completion_time, m.score 
             FROM marks2 m
             JOIN exam e ON m.exam_title = e.exam_title AND m.subject = e.subject
             WHERE e.teacher_name = ? AND m.exam_title = ? AND m.subject = ?";
@@ -56,6 +59,7 @@ if ($showResults) {
     $stmt2->execute([$teacherName, $examTitle, $subject]);
     while ($row = $stmt2->fetch(PDO::FETCH_ASSOC)) {
         $enhancedTimesAssoc[$row['student_name']] = round($row['completion_time'] / 60, 2);
+        $enhancedScoresAssoc[$row['student_name']] = $row['score'];
     }
 
     // Get and sort unique student names
@@ -136,7 +140,9 @@ if ($showResults) {
                         <tr class="bg-green-600 text-white">
                             <th class="p-3 text-left">Student Name</th>
                             <th class="p-3 text-left">Quiz Time (minutes)</th>
+                            <th class="p-3 text-left">Quiz Score</th>
                             <th class="p-3 text-left">Enhanced Quiz Time (minutes)</th>
+                            <th class="p-3 text-left">Enhanced Quiz Score</th>
                         </tr>
                     </thead>
                     <tbody>
@@ -144,7 +150,9 @@ if ($showResults) {
                             <tr class="border-b border-green-200 hover:bg-green-50 transition">
                                 <td class="p-3"><?= htmlspecialchars($student) ?></td>
                                 <td class="p-3"><?= $quizTimesAssoc[$student] ?? 'N/A' ?></td>
+                                <td class="p-3"><?= $quizScoresAssoc[$student] ?? 'N/A' ?></td>
                                 <td class="p-3"><?= $enhancedTimesAssoc[$student] ?? 'N/A' ?></td>
+                                <td class="p-3"><?= $enhancedScoresAssoc[$student] ?? 'N/A' ?></td>
                             </tr>
                         <?php } ?>
                     </tbody>
